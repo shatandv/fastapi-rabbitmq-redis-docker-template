@@ -1,0 +1,62 @@
+# Code was reworked from repo: https://github.com/GregaVrbancic/fastapi-celery
+version: "3.8"
+
+services:
+  fastapi:
+    build: ./app
+    command: "hypercorn main:app --bind 0.0.0.0:8000 --reload"
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./app:/opt/app"
+    depends_on:
+      - rabbitmq
+      - redis
+
+  worker:
+    build: ./app
+    command: "celery -A worker.celery_worker worker --loglevel=info -Q test-queue --concurrency=6"
+    volumes:
+      - "./app:/opt/app"
+    depends_on:
+      - rabbitmq
+      - redis
+
+  celery-flower:
+    image: gregsi/latest-celery-flower-docker:latest
+    environment:
+      AMQP_USERNAME: user
+      AMQP_PASSWORD: pass
+      AMQP_ADMIN_USERNAME: user
+      AMQP_ADMIN_PASSWORD: pass
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: 5672
+      AMQP_ADMIN_HOST: rabbitmq
+      AMQP_ADMIN_PORT: 15672
+      FLOWER_BASIC_AUTH: user:test
+    ports:
+      - "5555:5555"
+    depends_on:
+      - rabbitmq
+      - redis
+
+  rabbitmq:
+    hostname: rabbitmq
+    image: "rabbitmq:3.8.16-management"
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: pass
+    ports:
+      - "15672:15672"
+    volumes:
+      - "rabbitmq_data:/var/lib/rabbitmq"
+
+  redis:
+    image: "redis:6.2.3-alpine"
+    volumes:
+      - "redis_data:/data"
+
+
+volumes:
+  rabbitmq_data:
+  redis_data:
